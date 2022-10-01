@@ -1,0 +1,87 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "popmovieslambda": {
+            "Type" : "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "handler.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "S3Bucket": "popular-movies-but-python",
+                    "S3Key": "pmbp.zip"
+                },
+                "Runtime": "python3.8",
+                "Timeout": 15,
+                "MemorySize": 128,
+                "FunctionName":"popular-movies-but-python",
+                "Environment": {
+                    "Variables" : {
+                        "tmdbapikey": {"Ref": "tmdbapikey"},
+                        "omdbapikey": {"Ref": "omdbapikey"}
+                    }
+                  }
+            }
+        },
+        "lambdaScheduler" :{
+            "Type" : "AWS::Events::Rule",
+            "Properties" : {
+                "Name": "lambda-scheduler-rule",
+                "Description":"triggers my lamdba once per day",
+                "ScheduleExpression": "cron(0 7 ? * * *)",
+                "State": "Enabled",
+                "Targets": [
+                    {
+                        "Arn": {"Fn:GetAtt": [ "popmovieslambda", "Arn" ]},
+                        "Id": "TargetFunction"
+                    }
+                ]
+                
+            }
+        },
+        "lambdaSchedulerPermission": {
+            "Type" : "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {"Ref":"popmovieslambda"},
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {"Fn:GetAtt": [ "lambdaScheduler", "Arn" ]}
+            }
+        },
+        "LambdaExecutionRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [{ "Effect": "Allow", "Principal": {"Service": ["lambda.amazonaws.com"]}, "Action": ["sts:AssumeRole"] }]
+            },
+            "Path": "/",
+            "Policies": [{
+              "PolicyName": "inline-lamdba-policy",
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [{ 
+                    "Effect": "Allow", 
+                    "Action": ["s3:*"], 
+                    "Resource": "arn:aws:s3:::popular-movies-but-python/*" 
+                }]
+              }
+            }]
+          }
+        }
+    },
+    "Parameters" : {
+        "tmdbapikey" : {
+          "Type" : "string",
+          "NoEcho": "true"
+        },
+        "omdbapikey" : {
+            "Type" : "string",
+            "NoEcho": "true"
+          }
+    }
+}
